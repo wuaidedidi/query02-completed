@@ -1,0 +1,12 @@
+{
+  "name": "prompt-rollout-board",
+  "version": "1.0.0",
+  "description": "A 7-round prompt rollout board built with Electron.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}

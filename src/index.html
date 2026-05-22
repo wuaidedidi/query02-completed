@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prompt Rollout Board</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="idleView" class="panel active">
+        <h1>Prompt Rollout Board</h1>
+        <p>准备 7 个 prompt，生成 7 × 5 的模型表格。</p>
+        <button id="openSetupBtn" class="primary-button large-button">开始</button>
+      </section>
+
+      <section id="setupView" class="panel hidden">
+        <div class="panel-header">
+          <div>
+            <h2>输入 7 个 Prompt</h2>
+            <p>每一行对应一个 prompt，生成后会自动复制到 5 个模型格子里。</p>
+          </div>
+          <button id="backBtn" class="ghost-button">返回</button>
+        </div>
+
+        <form id="setupForm" class="setup-grid">
+          <div class="prompt-list" id="promptList"></div>
+          <div class="setup-actions">
+            <button type="button" id="clearDraftBtn" class="ghost-button">清空草稿</button>
+            <button type="submit" class="primary-button">生成表格</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="boardView" class="panel hidden">
+        <div class="panel-header board-toolbar">
+          <div>
+            <h2>7 × 5 Rollout 表格</h2>
+            <p>每行使用同一个 prompt，点“完成”后该格变黑。全部完成后自动回到开始页。</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="editPromptsBtn" class="ghost-button">编辑 Prompt</button>
+            <button id="restartBtn" class="ghost-button danger">重新开始</button>
+          </div>
+        </div>
+        <div id="boardGrid" class="board-grid"></div>
+      </section>
+    </main>
+
+    <div id="copyToast" class="copy-toast" role="status" aria-live="polite">复制成功</div>
+
+    <template id="promptInputTemplate">
+      <label class="prompt-field">
+        <span class="prompt-label"></span>
+        <textarea rows="3" class="prompt-textarea" placeholder="输入第 1 行 Prompt"></textarea>
+      </label>
+    </template>
+
+      <template id="cellTemplate">
+        <article class="cell">
+          <div class="cell-top">
+            <div class="cell-meta">
+              <span class="row-badge"></span>
+              <h3 class="model-name"></h3>
+            </div>
+            <span class="status-pill">待完成</span>
+          </div>
+          <div class="cell-actions">
+            <button class="copy-button" type="button">一键复制 prompt</button>
+            <button class="complete-button" type="button">确认完成</button>
+          </div>
+        </article>
+    </template>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
