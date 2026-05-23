@@ -1,33 +1,47 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Prompt Rollout Board</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
+      <header class="topbar">
+        <div class="topbar-actions">
+          <button id="patchShortcutBtn" class="primary-button patch-button" type="button">patch快捷按钮</button>
+          <button id="importDirectoryBtn" class="ghost-button" type="button">导入目录</button>
+        </div>
+        <div class="topbar-status">
+          <div id="rootStatusLabel" class="root-status">未导入工作目录</div>
+          <div id="flowStatusLabel" class="flow-status">先导入目录，再填写 7 个 prompt</div>
+        </div>
+      </header>
+
       <section id="idleView" class="panel active">
         <h1>Prompt Rollout Board</h1>
-        <p>准备 7 个 prompt，生成 7 × 5 的模型表格。</p>
-        <button id="openSetupBtn" class="primary-button large-button">开始</button>
+        <p>先导入工作目录，再填写 7 个 prompt，最后把 sessionid 和轨迹写入 35 个格子。</p>
+        <button id="openSetupBtn" class="primary-button large-button" type="button">导入目录</button>
       </section>
 
       <section id="setupView" class="panel hidden">
         <div class="panel-header">
           <div>
             <h2>输入 7 个 Prompt</h2>
-            <p>每一行对应一个 prompt，生成后会自动复制到 5 个模型格子里。</p>
+            <p>每一行对应一个 prompt，生成后会在表格里用于复制。</p>
           </div>
-          <button id="backBtn" class="ghost-button">返回</button>
+          <button id="backBtn" class="ghost-button" type="button">返回开始</button>
         </div>
 
         <form id="setupForm" class="setup-grid">
           <div class="prompt-list" id="promptList"></div>
           <div class="setup-actions">
-            <button type="button" id="clearDraftBtn" class="ghost-button">清空草稿</button>
+            <button id="clearDraftBtn" class="ghost-button" type="button">清空草稿</button>
             <button type="submit" class="primary-button">生成表格</button>
           </div>
         </form>
@@ -36,12 +50,12 @@
       <section id="boardView" class="panel hidden">
         <div class="panel-header board-toolbar">
           <div>
-            <h2>7 × 5 Rollout 表格</h2>
-            <p>每行使用同一个 prompt，点“完成”后该格变黑。全部完成后自动回到开始页。</p>
+            <h2>7 × 5 写入表格</h2>
+            <p>点“填写/编辑”后粘贴 sessionid 和轨迹，确认后会写入对应的 txt 和 json 文件。</p>
           </div>
           <div class="toolbar-actions">
-            <button id="editPromptsBtn" class="ghost-button">编辑 Prompt</button>
-            <button id="restartBtn" class="ghost-button danger">重新开始</button>
+            <button id="editPromptsBtn" class="ghost-button" type="button">编辑 Prompt</button>
+            <button id="reloadDirectoryBtn" class="ghost-button" type="button">重新读取目录</button>
           </div>
         </div>
         <div id="boardGrid" class="board-grid"></div>
@@ -50,6 +64,40 @@
 
     <div id="copyToast" class="copy-toast" role="status" aria-live="polite">复制成功</div>
 
+    <div id="cellEditorModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-editor="true"></div>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+        <div class="modal-header">
+          <div>
+            <h2 id="editorTitle">编辑格子</h2>
+            <p id="editorSubtitle">请输入 sessionid 和轨迹后再确认写入。</p>
+          </div>
+          <button id="closeEditorBtn" class="ghost-button" type="button">关闭</button>
+        </div>
+
+        <label class="editor-field">
+          <span class="editor-label">sessionid</span>
+          <input id="sessionidInput" class="editor-input" type="text" spellcheck="false" autocomplete="off" />
+        </label>
+
+        <label class="editor-field">
+          <span class="editor-label">轨迹</span>
+          <textarea
+            id="trajectoryInput"
+            class="editor-textarea"
+            rows="14"
+            spellcheck="false"
+            autocomplete="off"
+          ></textarea>
+        </label>
+
+        <div id="editorHint" class="editor-hint"></div>
+        <div class="modal-actions">
+          <button id="writeCellBtn" class="primary-button" type="button">确定写入</button>
+        </div>
+      </div>
+    </div>
+
     <template id="promptInputTemplate">
       <label class="prompt-field">
         <span class="prompt-label"></span>
@@ -57,20 +105,30 @@
       </label>
     </template>
 
-      <template id="cellTemplate">
-        <article class="cell">
-          <div class="cell-top">
-            <div class="cell-meta">
-              <span class="row-badge"></span>
-              <h3 class="model-name"></h3>
-            </div>
-            <span class="status-pill">待完成</span>
+    <template id="cellTemplate">
+      <article class="cell">
+        <div class="cell-top">
+          <div class="cell-meta">
+            <span class="row-badge"></span>
+            <h3 class="model-name"></h3>
           </div>
-          <div class="cell-actions">
-            <button class="copy-button" type="button">一键复制 prompt</button>
-            <button class="complete-button" type="button">确认完成</button>
+          <span class="status-pill">未保存</span>
+        </div>
+        <div class="cell-stats">
+          <div class="cell-stat">
+            <span>sessionid</span>
+            <strong class="session-state"></strong>
           </div>
-        </article>
+          <div class="cell-stat">
+            <span>轨迹</span>
+            <strong class="trajectory-state"></strong>
+          </div>
+        </div>
+        <div class="cell-actions">
+          <button class="copy-button" type="button">复制 prompt</button>
+          <button class="edit-button" type="button">填写/编辑</button>
+        </div>
+      </article>
     </template>
 
     <script src="./renderer.js"></script>
