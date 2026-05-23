@@ -14,7 +14,6 @@
     <main class="app-shell">
       <header class="topbar">
         <div class="topbar-actions">
-          <button id="patchShortcutBtn" class="primary-button patch-button" type="button">patch快捷按钮</button>
           <button id="importDirectoryBtn" class="ghost-button" type="button">导入目录</button>
         </div>
         <div class="topbar-status">
@@ -61,6 +60,10 @@
         <div id="boardGrid" class="board-grid"></div>
       </section>
     </main>
+
+    <div class="floating-tools">
+      <button id="patchShortcutBtn" class="primary-button patch-button floating-patch-button" type="button">patch快捷按钮</button>
+    </div>
 
     <div id="copyToast" class="copy-toast" role="status" aria-live="polite">复制成功</div>
 
@@ -111,6 +114,7 @@
           <div class="cell-meta">
             <span class="row-badge"></span>
             <h3 class="model-name"></h3>
+            <div class="cell-note"></div>
           </div>
           <span class="status-pill">未保存</span>
         </div>

@@ -11,6 +11,7 @@ const folderColumns = [
   { name: 'R5', label: 'R5' }
 ];
 
+const r5RotationHint = '按行轮转';
 const promptCount = 7;
 const columnsPerRow = folderColumns.length;
 const patchCommand = `p=$(ls *.patch 2>/dev/null | sed 's/.patch//' | sort -n | tail -1 | awk '{print $1+1}'); p="\${p:-1}.patch"; printf "即将生成: $p\\n"; git add -A -- ':!*.patch' && git diff --cached > "$p" && git reset --hard HEAD && git clean -fd -e "*.patch" && printf "\\n\\033[32m✅ 成功：$p 已生成，环境已重置\\033[0m\\n\\n"`;
@@ -325,6 +326,7 @@ function renderBoard() {
       const cell = fragment.querySelector('.cell');
       const rowBadge = fragment.querySelector('.row-badge');
       const modelName = fragment.querySelector('.model-name');
+      const cellNote = fragment.querySelector('.cell-note');
       const statusPill = fragment.querySelector('.status-pill');
       const sessionState = fragment.querySelector('.session-state');
       const trajectoryState = fragment.querySelector('.trajectory-state');
@@ -340,6 +342,10 @@ function renderBoard() {
 
       rowBadge.textContent = `第 ${rowIndex + 1} 行 · 第 ${columnIndex + 1} 列`;
       modelName.textContent = cellData.folderLabel;
+      if (cellData.folderName === 'R5') {
+        cellNote.textContent = r5RotationHint;
+        cellNote.classList.add('visible');
+      }
       statusPill.textContent = isDuplicate ? '重复' : getCellStatus(cellData);
       sessionState.textContent = getFieldLabel(cellData.sessionid, cellData.sessionExists);
       trajectoryState.textContent = getFieldLabel(cellData.trajectory, cellData.trajectoryExists, true);
