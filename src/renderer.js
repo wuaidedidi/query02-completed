@@ -14,7 +14,7 @@ const folderColumns = [
 const r5RotationModels = ['MinMax-M2.7', 'GLM-5.1', 'Qwen3.6-Plus'];
 const promptCount = 7;
 const columnsPerRow = folderColumns.length;
-const patchCommand = `p=$(ls *.patch 2>/dev/null | sed 's/.patch//' | sort -n | tail -1 | awk '{print $1+1}'); p="\${p:-1}.patch"; printf "即将生成: $p\\n"; git add -A -- ':!*.patch' && git diff --cached > "$p" && git reset --hard HEAD && git clean -fd -e "*.patch" && printf "\\n\\033[32m✅ 成功：$p 已生成，环境已重置\\033[0m\\n\\n"`;
+const patchCommand = String.raw`git rev-parse --is-inside-work-tree >/dev/null 2>&1 && { git config user.email >/dev/null || git config user.email "bot@example.com"; git config user.name >/dev/null || git config user.name "bot"; if git rev-parse --verify HEAD >/dev/null 2>&1; then n=$(find . -maxdepth 1 -type f -name "*.patch" | sed -n 's#^\./\([0-9][0-9]*\)\.patch$#\1#p' | sort -n | tail -1); p="$(( ${'${n:-0}'} + 1 )).patch"; printf "即将生成: %s\n" "$p"; git add -A -- ':!*.patch'; git diff --cached --binary > "$p"; if [ "$(wc -c < "$p")" -gt 1048576 ]; then echo "patch 超过 1MB，重新生成..."; git reset && git diff --binary > "$p"; fi; git reset --hard HEAD && git clean -fd -e "*.patch"; printf "\n\033[32m✅ 成功：%s 已生成，环境已重置\033[0m\n\n" "$p"; else git add -A -- ':!*.patch' && git commit -m "initial base" >/dev/null && echo "✨ 已自动创建初始提交，请再次运行命令以生成第一个补丁"; fi; } || echo "❌ 不是 Git 仓库（请先执行 git init）"`;
 
 const idleView = document.getElementById('idleView');
 const setupView = document.getElementById('setupView');
