@@ -289,7 +289,7 @@ button {
 }
 
 .cell {
-  min-height: 206px;
+  min-height: 236px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -312,6 +312,10 @@ button {
 
 .cell.duplicate {
   border-color: rgba(239, 68, 68, 0.7);
+}
+
+.cell.perfect {
+  border-color: rgba(34, 197, 94, 0.72);
 }
 
 .cell-top {
@@ -378,6 +382,20 @@ button {
   color: #fecaca;
 }
 
+.cell.perfect .status-pill {
+  background: rgba(34, 197, 94, 0.16);
+  color: #bbf7d0;
+}
+
+.cell.duplicate {
+  border-color: rgba(239, 68, 68, 0.7);
+}
+
+.cell.duplicate .status-pill {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+}
+
 .cell-stats {
   display: grid;
   gap: 8px;
@@ -403,6 +421,18 @@ button {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cell-stat strong.state-missing {
+  color: #fca5a5;
+}
+
+.cell-stat strong.state-ready {
+  color: #bbf7d0;
+}
+
+.cell-stat strong.state-perfect {
+  color: #86efac;
 }
 
 .copy-button,

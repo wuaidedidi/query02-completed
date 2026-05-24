@@ -79,6 +79,7 @@ function createCell(rowIndex, columnIndex) {
     trajectory: '',
     sessionExists: false,
     trajectoryExists: false,
+    patchExists: false,
     saved: false
   };
 }
@@ -157,6 +158,22 @@ function updateTopbarStatus() {
   flowStatusLabel.textContent = labels[state.mode] || labels.idle;
 }
 
+function normalizeSnapshotCells(cells) {
+  if (!Array.isArray(cells)) {
+    return createEmptyCells();
+  }
+
+  return Array.from({ length: promptCount }, (_row, rowIndex) =>
+    Array.from({ length: columnsPerRow }, (_column, columnIndex) => {
+      const fallback = createCell(rowIndex, columnIndex);
+      return {
+        ...fallback,
+        ...(cells[rowIndex]?.[columnIndex] || {})
+      };
+    })
+  );
+}
+
 function setMode(mode) {
   state.mode = mode;
   idleView.classList.toggle('hidden', mode !== 'idle');
@@ -207,8 +224,17 @@ async function loadDirectoryIntoState(rootDir) {
     throw new Error(result?.error || '目录读取失败');
   }
 
-  state.cells = result.cells;
+  state.cells = normalizeSnapshotCells(result.cells);
   return result;
+}
+
+async function startDirectoryWatch(rootDir) {
+  if (window.electronAPI?.startBoardWatch) {
+    const result = await window.electronAPI.startBoardWatch(rootDir);
+    if (!result?.ok) {
+      throw new Error(result?.error || '目录监听失败');
+    }
+  }
 }
 
 async function importDirectory() {
@@ -219,6 +245,7 @@ async function importDirectory() {
     }
 
     await loadDirectoryIntoState(directory);
+    await startDirectoryWatch(directory);
     state.rootDir = directory;
     saveStoredString(storageKeys.rootDir, directory);
     state.prompts = loadDraftPrompts();
@@ -244,6 +271,7 @@ async function openBoardFromCurrentPrompts() {
 
   try {
     await loadDirectoryIntoState(state.rootDir);
+    await startDirectoryWatch(state.rootDir);
     saveDraftPrompts(state.prompts);
     renderBoard();
     setMode('board');
@@ -271,13 +299,49 @@ function hasFieldValue(value) {
 function getCellStatus(cell) {
   const hasSession = hasFieldValue(cell.sessionid);
   const hasTrajectory = hasFieldValue(cell.trajectory);
+  if (hasSession && hasTrajectory && cell.saved && cell.patchExists) {
+    return '完美';
+  }
   if (hasSession && hasTrajectory && cell.saved) {
     return '已保存';
+  }
+  if (cell.patchExists) {
+    return 'patch已有';
   }
   if (hasSession || hasTrajectory || cell.sessionExists || cell.trajectoryExists) {
     return '待补齐';
   }
   return '未开始';
+}
+
+function getPatchLabel(cell) {
+  if (cell.saved && cell.patchExists) {
+    return '完美';
+  }
+  if (cell.patchExists) {
+    return 'patch已有';
+  }
+  return 'patch缺失';
+}
+
+function getFieldTone(value) {
+  return hasFieldValue(value) ? 'ready' : 'missing';
+}
+
+function getPatchTone(cell) {
+  if (cell.saved && cell.patchExists) {
+    return 'perfect';
+  }
+  if (cell.patchExists) {
+    return 'ready';
+  }
+  return 'missing';
+}
+
+function setStateText(element, text, tone) {
+  element.textContent = text;
+  element.classList.remove('state-missing', 'state-ready', 'state-perfect');
+  element.classList.add(`state-${tone}`);
 }
 
 function buildDuplicateStats() {
@@ -330,6 +394,7 @@ function renderBoard() {
       const statusPill = fragment.querySelector('.status-pill');
       const sessionState = fragment.querySelector('.session-state');
       const trajectoryState = fragment.querySelector('.trajectory-state');
+      const patchState = fragment.querySelector('.patch-state');
       const copyButton = fragment.querySelector('.copy-button');
       const editButton = fragment.querySelector('.edit-button');
       const sessionKey = normalizeSessionid(cellData.sessionid);
@@ -339,6 +404,7 @@ function renderBoard() {
       const isComplete = Boolean(cellData.saved && hasFieldValue(cellData.sessionid) && hasFieldValue(cellData.trajectory));
       const hasPartialData = !isComplete && (hasFieldValue(cellData.sessionid) || hasFieldValue(cellData.trajectory) || cellData.sessionExists || cellData.trajectoryExists);
       const isDuplicate = sessionDuplicate || trajectoryDuplicate;
+      const isPerfect = isComplete && cellData.patchExists;
 
       rowBadge.textContent = `第 ${rowIndex + 1} 行 · 第 ${columnIndex + 1} 列`;
       modelName.textContent = cellData.folderLabel;
@@ -347,11 +413,13 @@ function renderBoard() {
         cellNote.classList.add('visible');
       }
       statusPill.textContent = isDuplicate ? '重复' : getCellStatus(cellData);
-      sessionState.textContent = getFieldLabel(cellData.sessionid, cellData.sessionExists);
-      trajectoryState.textContent = getFieldLabel(cellData.trajectory, cellData.trajectoryExists, true);
+      setStateText(sessionState, getFieldLabel(cellData.sessionid, cellData.sessionExists), getFieldTone(cellData.sessionid));
+      setStateText(trajectoryState, getFieldLabel(cellData.trajectory, cellData.trajectoryExists, true), getFieldTone(cellData.trajectory));
+      setStateText(patchState, getPatchLabel(cellData), getPatchTone(cellData));
       cell.classList.toggle('completed', isComplete);
       cell.classList.toggle('partial', hasPartialData);
       cell.classList.toggle('duplicate', isDuplicate);
+      cell.classList.toggle('perfect', isPerfect);
 
       copyButton.disabled = !prompt.trim();
       copyButton.addEventListener('click', () => {
@@ -576,6 +644,24 @@ document.addEventListener('keydown', (event) => {
     closeEditor();
   }
 });
+
+if (window.electronAPI?.onBoardDirectoryUpdated) {
+  window.electronAPI.onBoardDirectoryUpdated((snapshot) => {
+    if (!snapshot?.ok) {
+      showToast(snapshot?.error || '目录刷新失败', true);
+      return;
+    }
+
+    if (snapshot.rootDir !== state.rootDir) {
+      return;
+    }
+
+    state.cells = normalizeSnapshotCells(snapshot.cells);
+    if (state.mode === 'board') {
+      renderBoard();
+    }
+  });
+}
 
 updateTopbarStatus();
 setMode('idle');

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, clipboard, dialog } = require('electron');
-const fs = require('fs/promises');
+const fs = require('fs');
+const fsp = require('fs/promises');
 const path = require('path');
 
 const requiredFolders = [
@@ -11,6 +12,12 @@ const requiredFolders = [
 ];
 
 const roundCount = 7;
+const watchState = {
+  rootDir: '',
+  watchers: [],
+  debounceTimer: null
+};
+let mainWindowRef = null;
 
 ipcMain.handle('copy-text', (_event, text) => {
   clipboard.writeText(String(text ?? ''));
@@ -19,7 +26,7 @@ ipcMain.handle('copy-text', (_event, text) => {
 
 async function statDirectory(directoryPath) {
   try {
-    const stats = await fs.stat(directoryPath);
+    const stats = await fsp.stat(directoryPath);
     return stats.isDirectory();
   } catch {
     return false;
@@ -52,7 +59,7 @@ async function assertValidBoardDirectory(rootDir) {
 
 async function readFileIfExists(filePath) {
   try {
-    return await fs.readFile(filePath, 'utf8');
+    return await fsp.readFile(filePath, 'utf8');
   } catch (error) {
     if (error.code === 'ENOENT') {
       return '';
@@ -63,7 +70,7 @@ async function readFileIfExists(filePath) {
 
 async function fileExists(filePath) {
   try {
-    await fs.access(filePath);
+    await fsp.access(filePath);
     return true;
   } catch {
     return false;
@@ -82,11 +89,13 @@ async function loadBoardDirectory(rootDir) {
       const folderPath = path.join(rootDir, folder.name);
       const txtPath = path.join(folderPath, `${round}.txt`);
       const jsonPath = path.join(folderPath, `${round}.json`);
-      const [rawSessionid, rawTrajectory, sessionExists, trajectoryExists] = await Promise.all([
+      const patchPath = path.join(folderPath, `${round}.patch`);
+      const [rawSessionid, rawTrajectory, sessionExists, trajectoryExists, patchExists] = await Promise.all([
         readFileIfExists(txtPath),
         readFileIfExists(jsonPath),
         fileExists(txtPath),
-        fileExists(jsonPath)
+        fileExists(jsonPath),
+        fileExists(patchPath)
       ]);
 
       const sessionid = rawSessionid.replace(/\r\n/g, '\n').trim();
@@ -100,6 +109,7 @@ async function loadBoardDirectory(rootDir) {
         trajectory,
         sessionExists,
         trajectoryExists,
+        patchExists,
         saved: Boolean(sessionid && trajectory.trim())
       });
     }
@@ -113,6 +123,74 @@ async function loadBoardDirectory(rootDir) {
     folders: requiredFolders,
     cells
   };
+}
+
+function stopWatchingBoardDirectory() {
+  if (watchState.debounceTimer) {
+    clearTimeout(watchState.debounceTimer);
+    watchState.debounceTimer = null;
+  }
+
+  watchState.watchers.forEach((watcher) => {
+    try {
+      watcher.close();
+    } catch {
+      // ignore watcher shutdown errors
+    }
+  });
+
+  watchState.watchers = [];
+  watchState.rootDir = '';
+}
+
+async function broadcastBoardSnapshot(rootDir) {
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+    return;
+  }
+
+  const snapshot = await loadBoardDirectory(rootDir);
+  mainWindowRef.webContents.send('board-directory-updated', snapshot);
+}
+
+function scheduleBoardRefresh() {
+  if (!watchState.rootDir) {
+    return;
+  }
+
+  if (watchState.debounceTimer) {
+    clearTimeout(watchState.debounceTimer);
+  }
+
+  watchState.debounceTimer = setTimeout(() => {
+    watchState.debounceTimer = null;
+    broadcastBoardSnapshot(watchState.rootDir).catch((error) => {
+      if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+        mainWindowRef.webContents.send('board-directory-updated', {
+          ok: false,
+          error: error.message || '目录读取失败'
+        });
+      }
+    });
+  }, 180);
+}
+
+async function startWatchingBoardDirectory(rootDir) {
+  stopWatchingBoardDirectory();
+  watchState.rootDir = rootDir;
+
+  for (const folder of requiredFolders) {
+    const folderPath = path.join(rootDir, folder.name);
+
+    try {
+      const watcher = fs.watch(folderPath, () => {
+        scheduleBoardRefresh();
+      });
+
+      watchState.watchers.push(watcher);
+    } catch (error) {
+      console.warn(`Watch failed for ${folderPath}:`, error.message);
+    }
+  }
 }
 
 ipcMain.handle('select-board-directory', async () => {
@@ -137,6 +215,23 @@ ipcMain.handle('load-board-directory', async (_event, rootDir) => {
       error: error.message || '目录读取失败'
     };
   }
+});
+
+ipcMain.handle('start-board-watch', async (_event, rootDir) => {
+  try {
+    await startWatchingBoardDirectory(rootDir);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message || '目录监听失败'
+    };
+  }
+});
+
+ipcMain.handle('stop-board-watch', async () => {
+  stopWatchingBoardDirectory();
+  return { ok: true };
 });
 
 ipcMain.handle('save-board-cell', async (_event, payload) => {
@@ -166,8 +261,8 @@ ipcMain.handle('save-board-cell', async (_event, payload) => {
     const jsonPath = path.join(folderPath, `${round}.json`);
 
     await Promise.all([
-      fs.writeFile(txtPath, sessionid, 'utf8'),
-      fs.writeFile(jsonPath, trajectory, 'utf8')
+      fsp.writeFile(txtPath, sessionid, 'utf8'),
+      fsp.writeFile(jsonPath, trajectory, 'utf8')
     ]);
 
     return {
@@ -184,7 +279,7 @@ ipcMain.handle('save-board-cell', async (_event, payload) => {
 });
 
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  mainWindowRef = new BrowserWindow({
     width: 1280,
     height: 880,
     minWidth: 1040,
@@ -198,7 +293,12 @@ const createWindow = () => {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  mainWindowRef.on('closed', () => {
+    stopWatchingBoardDirectory();
+    mainWindowRef = null;
+  });
+
+  mainWindowRef.loadFile(path.join(__dirname, 'index.html'));
 };
 
 app.whenReady().then(() => {
@@ -212,6 +312,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  stopWatchingBoardDirectory();
   if (process.platform !== 'darwin') {
     app.quit();
   }
