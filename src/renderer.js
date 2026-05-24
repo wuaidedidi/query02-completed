@@ -11,7 +11,7 @@ const folderColumns = [
   { name: 'R5', label: 'R5' }
 ];
 
-const r5RotationHint = '按行轮转';
+const r5RotationModels = ['MinMax-M2.7', 'GLM-5.1', 'Qwen3.6-Plus'];
 const promptCount = 7;
 const columnsPerRow = folderColumns.length;
 const patchCommand = `p=$(ls *.patch 2>/dev/null | sed 's/.patch//' | sort -n | tail -1 | awk '{print $1+1}'); p="\${p:-1}.patch"; printf "即将生成: $p\\n"; git add -A -- ':!*.patch' && git diff --cached > "$p" && git reset --hard HEAD && git clean -fd -e "*.patch" && printf "\\n\\033[32m✅ 成功：$p 已生成，环境已重置\\033[0m\\n\\n"`;
@@ -409,7 +409,7 @@ function renderBoard() {
       rowBadge.textContent = `第 ${rowIndex + 1} 行 · 第 ${columnIndex + 1} 列`;
       modelName.textContent = cellData.folderLabel;
       if (cellData.folderName === 'R5') {
-        cellNote.textContent = r5RotationHint;
+        cellNote.textContent = r5RotationModels[rowIndex % r5RotationModels.length];
         cellNote.classList.add('visible');
       }
       statusPill.textContent = isDuplicate ? '重复' : getCellStatus(cellData);
