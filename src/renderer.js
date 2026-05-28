@@ -409,6 +409,7 @@ function renderBoard() {
       rowBadge.textContent = `第 ${rowIndex + 1} 行 · 第 ${columnIndex + 1} 列`;
       modelName.textContent = cellData.folderLabel;
       if (cellData.folderName === 'R5') {
+        cell.classList.add('r5-cell');
         cellNote.textContent = r5RotationModels[rowIndex % r5RotationModels.length];
         cellNote.classList.add('visible');
       }

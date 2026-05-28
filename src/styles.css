@@ -343,12 +343,24 @@ button {
   line-height: 1.25;
 }
 
+.r5-cell .model-name {
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
 .cell-note {
   display: none;
   color: #93c5fd;
   font-size: 11px;
   line-height: 1.35;
   white-space: pre-line;
+}
+
+.r5-cell .cell-note {
+  color: #bfdbfe;
+  font-size: 17px;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 .cell-note.visible {
