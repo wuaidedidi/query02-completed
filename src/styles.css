@@ -495,6 +495,37 @@ button {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
 }
 
+.model-switch-card {
+  width: min(560px, 100%);
+  border-color: rgba(96, 165, 250, 0.42);
+}
+
+.model-switch-content {
+  display: grid;
+  gap: 10px;
+}
+
+.model-switch-kicker {
+  margin: 0;
+  color: #93c5fd;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.model-switch-content h2 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.15;
+}
+
+.model-switch-message {
+  margin: 4px 0 0;
+  color: #f8fafc;
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
 .modal-header {
   display: flex;
   align-items: flex-start;

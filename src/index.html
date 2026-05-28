@@ -101,6 +101,20 @@
       </div>
     </div>
 
+    <div id="modelSwitchModal" class="modal model-switch-modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-model-switch="true"></div>
+      <div class="modal-card model-switch-card" role="dialog" aria-modal="true" aria-labelledby="modelSwitchTitle">
+        <div class="model-switch-content">
+          <p class="model-switch-kicker">切换模型提醒</p>
+          <h2 id="modelSwitchTitle">记得切换模型</h2>
+          <p id="modelSwitchMessage" class="model-switch-message"></p>
+        </div>
+        <div class="modal-actions">
+          <button id="closeModelSwitchBtn" class="primary-button" type="button">知道了</button>
+        </div>
+      </div>
+    </div>
+
     <template id="promptInputTemplate">
       <label class="prompt-field">
         <span class="prompt-label"></span>

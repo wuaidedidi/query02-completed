@@ -42,6 +42,9 @@ const editorHint = document.getElementById('editorHint');
 const sessionidInput = document.getElementById('sessionidInput');
 const trajectoryInput = document.getElementById('trajectoryInput');
 const writeCellBtn = document.getElementById('writeCellBtn');
+const modelSwitchModal = document.getElementById('modelSwitchModal');
+const modelSwitchMessage = document.getElementById('modelSwitchMessage');
+const closeModelSwitchBtn = document.getElementById('closeModelSwitchBtn');
 
 let toastTimer = null;
 
@@ -511,7 +514,7 @@ function renderBoard() {
       modelName.textContent = cellData.folderLabel;
       if (cellData.folderName === 'R5') {
         cell.classList.add('r5-cell');
-        cellNote.textContent = r5RotationModels[rowIndex % r5RotationModels.length];
+        cellNote.textContent = getR5ModelForRow(rowIndex);
         cellNote.classList.add('visible');
       }
       statusPill.textContent = isDuplicate ? '重复' : getCellStatus(cellData);
@@ -556,6 +559,33 @@ function closeEditor() {
   cellEditorModal.classList.add('hidden');
   cellEditorModal.setAttribute('aria-hidden', 'true');
   editorHint.classList.remove('error');
+}
+
+function getR5ModelForRow(rowIndex) {
+  return r5RotationModels[rowIndex % r5RotationModels.length];
+}
+
+function openModelSwitchReminder(rowIndex) {
+  if (!modelSwitchModal || !modelSwitchMessage) {
+    return;
+  }
+
+  const nextRowIndex = rowIndex + 1;
+  modelSwitchMessage.textContent = nextRowIndex >= promptCount
+    ? 'R5 已完成最后一轮。'
+    : `下一个模型：${getR5ModelForRow(nextRowIndex)}！！！！`;
+  modelSwitchModal.classList.remove('hidden');
+  modelSwitchModal.setAttribute('aria-hidden', 'false');
+  closeModelSwitchBtn?.focus();
+}
+
+function closeModelSwitchReminder() {
+  if (!modelSwitchModal) {
+    return;
+  }
+
+  modelSwitchModal.classList.add('hidden');
+  modelSwitchModal.setAttribute('aria-hidden', 'true');
 }
 
 function setEditorError(message) {
@@ -669,6 +699,9 @@ async function writeActiveCell() {
     renderBoard();
     closeEditor();
     showToast(`写入成功：${cellData.folderLabel} / ${cellData.round}.txt + ${cellData.round}.json`);
+    if (cellData.folderName === 'R5') {
+      openModelSwitchReminder(rowIndex);
+    }
   } catch (error) {
     console.error('Write cell failed:', error);
     const message = error.message || '写入失败，请检查目录权限';
@@ -733,6 +766,7 @@ setupForm.addEventListener('submit', handleSetupSubmit);
 editPromptsBtn.addEventListener('click', startPromptEditing);
 reloadDirectoryBtn.addEventListener('click', reloadDirectory);
 closeEditorBtn.addEventListener('click', closeEditor);
+closeModelSwitchBtn.addEventListener('click', closeModelSwitchReminder);
 writeCellBtn.addEventListener('click', writeActiveCell);
 sessionidInput.addEventListener('input', updateEditorHint);
 trajectoryInput.addEventListener('input', updateEditorHint);
@@ -741,8 +775,22 @@ cellEditorModal.addEventListener('click', (event) => {
     closeEditor();
   }
 });
+modelSwitchModal.addEventListener('click', (event) => {
+  if (event.target?.dataset?.closeModelSwitch) {
+    closeModelSwitchReminder();
+  }
+});
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !cellEditorModal.classList.contains('hidden')) {
+  if (event.key !== 'Escape') {
+    return;
+  }
+
+  if (!modelSwitchModal.classList.contains('hidden')) {
+    closeModelSwitchReminder();
+    return;
+  }
+
+  if (!cellEditorModal.classList.contains('hidden')) {
     closeEditor();
   }
 });
