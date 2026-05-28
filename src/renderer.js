@@ -237,6 +237,100 @@ async function startDirectoryWatch(rootDir) {
   }
 }
 
+function parsePromptMarkdown(content) {
+  const text = String(content ?? '').replace(/\r\n/g, '\n').trim();
+  if (!text) {
+    throw new Error('prompt.md 为空');
+  }
+
+  const entries = new Map();
+  let currentNumber = null;
+
+  text.split('\n').forEach((line) => {
+    const match = line.match(/^\s*([1-7])(?:\s*[.．、,)）:：，,]|\s+)(.*)$/);
+    if (match) {
+      currentNumber = Number(match[1]);
+      if (entries.has(currentNumber)) {
+        throw new Error(`prompt.md 编号重复：${currentNumber}`);
+      }
+      entries.set(currentNumber, [match[2] || '']);
+      return;
+    }
+
+    if (currentNumber) {
+      entries.get(currentNumber).push(line);
+    }
+  });
+
+  const missing = [];
+  const empty = [];
+  const prompts = Array.from({ length: promptCount }, (_item, index) => {
+    const number = index + 1;
+    if (!entries.has(number)) {
+      missing.push(number);
+      return '';
+    }
+
+    const prompt = entries.get(number).join('\n').trim();
+    if (!prompt) {
+      empty.push(number);
+    }
+    return prompt;
+  });
+
+  if (missing.length > 0) {
+    throw new Error(`prompt.md 编号缺失：${missing.join('、')}`);
+  }
+
+  if (entries.size !== promptCount) {
+    throw new Error(`prompt.md 只解析到 ${entries.size} 条 prompt，需要 7 条`);
+  }
+
+  if (empty.length > 0) {
+    throw new Error(`prompt.md 中第 ${empty.join('、')} 条 prompt 为空`);
+  }
+
+  return prompts;
+}
+
+async function loadPromptsFromDirectory(rootDir) {
+  if (!window.electronAPI?.readPromptFile) {
+    return {
+      loaded: false,
+      message: '当前环境不支持读取 prompt.md'
+    };
+  }
+
+  const result = await window.electronAPI.readPromptFile(rootDir);
+  if (!result?.ok) {
+    return {
+      loaded: false,
+      message: result?.error || 'prompt.md 读取失败'
+    };
+  }
+
+  if (!result.found) {
+    return {
+      loaded: false,
+      message: '未找到 prompt.md，请手动填写 7 条 prompt'
+    };
+  }
+
+  try {
+    const prompts = parsePromptMarkdown(result.content);
+    return {
+      loaded: true,
+      prompts,
+      message: `成功加载 ${result.dirName || '当前目录'} 的 prompt`
+    };
+  } catch (error) {
+    return {
+      loaded: false,
+      message: error.message || 'prompt.md 格式不正确'
+    };
+  }
+}
+
 async function importDirectory() {
   try {
     const directory = await window.electronAPI?.selectBoardDirectory();
@@ -248,10 +342,17 @@ async function importDirectory() {
     await startDirectoryWatch(directory);
     state.rootDir = directory;
     saveStoredString(storageKeys.rootDir, directory);
-    state.prompts = loadDraftPrompts();
+    const promptResult = await loadPromptsFromDirectory(directory);
+    if (promptResult.loaded) {
+      state.prompts = promptResult.prompts;
+      saveDraftPrompts(state.prompts);
+      showToast(promptResult.message);
+    } else {
+      state.prompts = loadDraftPrompts();
+      showToast(promptResult.message, true);
+    }
     renderPromptInputs(state.prompts);
     setMode('setup');
-    showToast('目录已导入，请填写 7 个 prompt');
   } catch (error) {
     console.error('Import directory failed:', error);
     showToast(error.message || '目录导入失败', true);

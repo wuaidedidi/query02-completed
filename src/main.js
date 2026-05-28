@@ -217,6 +217,35 @@ ipcMain.handle('load-board-directory', async (_event, rootDir) => {
   }
 });
 
+ipcMain.handle('read-prompt-file', async (_event, rootDir) => {
+  try {
+    await assertValidBoardDirectory(rootDir);
+
+    const promptPath = path.join(rootDir, 'prompt.md');
+    const exists = await fileExists(promptPath);
+    if (!exists) {
+      return {
+        ok: true,
+        found: false,
+        dirName: path.basename(rootDir)
+      };
+    }
+
+    const content = await fsp.readFile(promptPath, 'utf8');
+    return {
+      ok: true,
+      found: true,
+      dirName: path.basename(rootDir),
+      content
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message || 'prompt.md 读取失败'
+    };
+  }
+});
+
 ipcMain.handle('start-board-watch', async (_event, rootDir) => {
   try {
     await startWatchingBoardDirectory(rootDir);
