@@ -240,6 +240,10 @@ async function startDirectoryWatch(rootDir) {
   }
 }
 
+function matchPromptNumberLine(line) {
+  return String(line).match(/^\s*([1-7])(?:\s*[.．、,)）:：，,]\s*|\s+)(.*)$/);
+}
+
 function parsePromptMarkdown(content) {
   const text = String(content ?? '').replace(/\r\n/g, '\n').trim();
   if (!text) {
@@ -250,7 +254,7 @@ function parsePromptMarkdown(content) {
   let currentNumber = null;
 
   text.split('\n').forEach((line) => {
-    const match = line.match(/^\s*([1-7])(?:\s*[.．、,)）:：，,]|\s+)(.*)$/);
+    const match = matchPromptNumberLine(line);
     if (match) {
       currentNumber = Number(match[1]);
       if (entries.has(currentNumber)) {
