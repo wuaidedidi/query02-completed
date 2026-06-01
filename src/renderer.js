@@ -47,11 +47,12 @@ const modelSwitchMessage = document.getElementById('modelSwitchMessage');
 const closeModelSwitchBtn = document.getElementById('closeModelSwitchBtn');
 
 let toastTimer = null;
+const initialRootDir = loadStoredString(storageKeys.rootDir);
 
 const state = {
   mode: 'idle',
-  rootDir: loadStoredString(storageKeys.rootDir),
-  prompts: loadDraftPrompts(),
+  rootDir: initialRootDir,
+  prompts: loadDraftPrompts(initialRootDir),
   cells: createEmptyCells(),
   activeCell: null
 };
@@ -70,6 +71,10 @@ function saveStoredString(key, value) {
   } catch {
     // Local storage is only a convenience cache.
   }
+}
+
+function getPromptStorageKey(rootDir) {
+  return rootDir ? `${storageKeys.prompts}:${rootDir}` : storageKeys.prompts;
 }
 
 function createCell(rowIndex, columnIndex) {
@@ -132,9 +137,17 @@ function showToast(message, isError = false) {
   }, 2200);
 }
 
-function loadDraftPrompts() {
+function hasSavedDraftPrompts(rootDir) {
   try {
-    const raw = localStorage.getItem(storageKeys.prompts);
+    return Boolean(localStorage.getItem(getPromptStorageKey(rootDir)));
+  } catch {
+    return false;
+  }
+}
+
+function loadDraftPrompts(rootDir) {
+  try {
+    const raw = localStorage.getItem(getPromptStorageKey(rootDir));
     if (!raw) {
       return Array.from({ length: promptCount }, () => '');
     }
@@ -146,8 +159,8 @@ function loadDraftPrompts() {
   }
 }
 
-function saveDraftPrompts(prompts) {
-  localStorage.setItem(storageKeys.prompts, JSON.stringify(prompts));
+function saveDraftPrompts(prompts, rootDir = state.rootDir) {
+  localStorage.setItem(getPromptStorageKey(rootDir), JSON.stringify(prompts));
 }
 
 function updateTopbarStatus() {
@@ -355,8 +368,14 @@ async function importDirectory() {
       saveDraftPrompts(state.prompts);
       showToast(promptResult.message);
     } else {
-      state.prompts = loadDraftPrompts();
-      showToast(promptResult.message, true);
+      const hasDirectoryDraft = hasSavedDraftPrompts(directory);
+      state.prompts = loadDraftPrompts(directory);
+      showToast(
+        hasDirectoryDraft
+          ? `${promptResult.message}；已加载当前目录的历史 prompt 草稿`
+          : `${promptResult.message}；当前目录没有历史草稿`,
+        true
+      );
     }
     renderPromptInputs(state.prompts);
     setMode('setup');
